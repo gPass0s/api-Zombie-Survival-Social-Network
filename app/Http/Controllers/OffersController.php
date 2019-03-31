@@ -7,6 +7,7 @@ use App\Belonging;
 use App\Item;
 use App\User;
 use App\Offer;
+use Validator;
 use Illuminate\Support\Facades\DB;
 
 class OffersController extends Controller
@@ -31,40 +32,66 @@ class OffersController extends Controller
 
     public function destroy(User $user, Request $request)
     {
-         if ($this->checkUser($user)!="ok") return response()->json($this->checkUser($user));
+        if ($this->checkUser($user)!="ok") return response()->json($this->checkUser($user));
+        
+        $validator = Validator::make($request->all(), [
+            'offer_id' => ['required','numeric']
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()], 401);
+        }
+
+        
         return response()->json($user->deleteOffer($request["offer_id"]));//
     }
 
     public function closeTrade(User $user, Request $request)
     {
-         if ($this->checkUser($user)!="ok") return response()->json($this->checkUser($user));
+        $validator = Validator::make($request->all(), [
+            'trade_id' => ['required','numeric']
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()], 401);
+        }
+
+
+        if ($this->checkUser($user)!="ok") return response()->json($this->checkUser($user));
 
         return response()->json($user->closeTrade($request["trade_id"]));
     }
 
-     public function myOpenTrades(User $user, Request $request)
+     public function myOpenTrades(User $user)
     {
-         if ($this->checkUser($user)!="ok") return response()->json($this->checkUser($user));
+        
+        if ($this->checkUser($user)!="ok") return response()->json($this->checkUser($user));
 
-        return response()->json($user->myOpenTrades($request["trade_id"]));
+        return response()->json($user->myOpenTrades());
     }
 
-    public function offerDetails(User $user, Request $request)
+    /*public function offerDetails(User $user, Request $request)
     {
          
-          if ($this->checkUser($user)!="ok") return response()->json($this->checkUser($user));
+         
+        if ($this->checkUser($user)!="ok") return response()->json($this->checkUser($user));
+         
+        $validator = Validator::make($request->all(), [
+            'offer_id' => ['required','numeric']
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()], 401);
+        }
+
          $offer = Offer::find($request['offer_id']);
          if (!$offer)  return response()->json("Error 019: Offer not found"); 
          return $offer->items()->where('offering',FALSE)->get();
-    }
+    }*/
 
     public function findOffersNearBy(User $user)
     {   
-         if ($this->checkUser($user)!="ok") return response()->json($this->checkUser($user));
-        
-        $offers = DB::select("SELECT *, SQRT(POW(69.1 * (latitude - '$user->latitude'), 2) + POW(69.1 * ('$user->longitude' - longitude) * COS(latitude / 57.3), 2))*1.60934 AS distance FROM offers WHERE status = 'open' and user_id != '$user->id' HAVING distance <= '$user->offer_range' ORDER BY distance");
-
-        return response()->json($offers);
+        return response()->json($user->findOffersNearBy($user));
     }
 
      private function checkUser($user)

@@ -54,52 +54,44 @@ class AccessController extends Controller
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'age' => ['required', 'integer'],
-            'gender' => ['required', 'string', 'max:10'],
-            'offer_range' => ['required', 'numeric', 'min:0.05'],
+            'gender' => ['required', 'string', 'max:20'],
+            'offer_search_distance' => ['required', 'numeric', 'min:0.05'],
             'location' => ['required','string','max:255'],
-            'secret_question' => ['required', 'string', 'max:255'],
-            'secret_answer' => ['required', 'string', 'max:255'],
         ]);
         
         if ($validator->fails()) return response()->json(['error' => $validator->errors()]);
 
+
+
         # Validating invetory
-        $invetory = $request['invetory'];
-        $items_invetory = array_unique($invetory);
-        $items = Item::all();
-        $items_validation = TRUE;
-        foreach ($items_invetory as $item)
-        {
-            $item_found = Item::where('item',strtoupper($item))->get();
-            if($item_found->count()==0)
-            {
-                $items_validation = FALSE;
-                break;
-            }
-        }
-        
-        if (!$items_validation) return response()->json("Error 003: There are invalid items in your invetory");
+        $invetory = $request['inventory'];
+
+        $items = array();
+        if ($invetory["water"]>0) for ($i=0; $i<$invetory["water"];$i++) array_push($items,"WATER");
+        if ($invetory["food"]>0) for ($i=0; $i<$invetory["food"];$i++) array_push($items,"FOOD");
+        if ($invetory["medication"]>0) for ($i=0; $i<$invetory["food"];$i++) array_push($items,"MEDICATION");
+        if ($invetory["ammunition"]>0) for ($i=0; $i<$invetory["food"];$i++) array_push($items,"AMMUNITION");
+
+        if (count($items) == 0) return response()->json(['error' => "Your inventory is empty"]);
 
         $location = app('App\Http\Controllers\UsersController')->getCoordinates($request['location']);
         
         if ($location == "Address not found") return response()->json(['error' =>$location]);
 
         $user = User::create([
-            'username' =>utf8_decode($request['username']),
+            'username' =>$request['username'],
             'password' => Hash::make($request['password']),
-            'first_name' =>utf8_decode(strtoupper($request['first_name'])),
-            'last_name' =>utf8_decode(strtoupper($request['last_name'])),
+            'first_name' =>strtoupper($request['first_name']),
+            'last_name' =>strtoupper($request['last_name']),
             'age' =>$request['age'],
             'gender' =>$request['gender'],
             'latitude' =>$location['latitude'],
             'longitude' =>$location['longitude'],
             'location' =>$location['location'],
-            'offer_range' =>$request['offer_range'],
-            'secret_question' =>utf8_decode($request['secret_question']),
-            'secret_answer' =>utf8_decode($request['secret_answer']),
+            'offer_range' =>$request['offer_search_distance'],
         ]);
 
-        $this->createInventory($user,$invetory);
+        $this->createInventory($user,$items);
 
         $user->updatePoints();
         $response = $this->reponseUser($user);
@@ -122,7 +114,7 @@ class AccessController extends Controller
             'latitude' => $user->latitude,
             'longitude' => $user->longitude,
             'location' => $user->location,
-            'offer_range' => $user->offer_range,
+            'offer_search_distance' => round($user->offer_range,2) . " km",
             'total_points' => $user->total_points,);
 
         return $response;

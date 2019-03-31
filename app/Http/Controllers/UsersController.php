@@ -21,7 +21,7 @@ class UsersController extends Controller
         if ($this->checkUser($user)!="ok") return response()->json($this->checkUser($user));
         
         $validator = Validator::make($request->all(), [
-            'offer_range' => ['numeric', 'min:0.05'],
+            'offer_search_distance' => ['numeric', 'min:0.05'],
             'location' => ['string','max:255'],
         ]);
 
@@ -29,6 +29,7 @@ class UsersController extends Controller
             return response()->json(['error' => $validator->errors()], 401);
         }
 
+        $flag01 = TRUE;
         if (isset($request["location"]))
         {
           $location = $this->getCoordinates($request['location']);
@@ -40,11 +41,21 @@ class UsersController extends Controller
         {
            $latitude = $user->latitude;
            $longitude = $user->longitude;
+           $flag01 = FALSE;
            $loc_formatted = $user->location;
 
         }
         
-        (isset($request["offer_range"])? $offer_range = $request["offer_range"] : $offer_range = $user->offer_range);
+        $flag02 = TRUE;
+        if (isset($request["offer_search_distance"]))
+        {
+            $offer_range = $request["offer_search_distance"];
+
+        } else
+        {
+            $flag02 = FALSE;
+            $offer_range = $user->offer_range;
+        }
         
         $data = array(
             "latitude" => $latitude,
@@ -53,7 +64,7 @@ class UsersController extends Controller
             "offer_range" => $offer_range,
             );
         
-        return response()->json($user->updateLocation($data));
+        return response()->json($user->updateLocation($data, $flag01,$flag02));
 //
     }
 
@@ -66,12 +77,20 @@ class UsersController extends Controller
         $medication = $user->belongings->where("item_name","MEDICATION")->count();
         $ammunition = $user->belongings->where("item_name","AMMUNITION")->count();
 
-        return response()->json(["Water"=> $water, "Food" => $food, "Medication" => $medication,"Ammuntion" =>$ammunition]);
+        return response()->json(["owner" => $user->first_name . " " . $user->last_name, "points" => $user->total_points,"items" => array("Water"=> $water, "Food" => $food, "Medication" => $medication,"Ammuntion" =>$ammunition)]);
 //
     }
 
     public function reportInfectedUser(User $user, Request $request)
     {
+        $validator = Validator::make($request->all(), [
+            'username' => ['required','string', 'max:255']
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()], 401);
+        }
+
         if ($this->checkUser($user)!="ok") return response()->json($this->checkUser($user));
         return response()->json($user->addInfectionReport($request));
 //
@@ -80,7 +99,7 @@ class UsersController extends Controller
     public function notifications(User $user)
     {
         
-         if ($this->checkUser($user)!="ok") return response()->json($this->checkUser($user));
+        if ($this->checkUser($user)!="ok") return response()->json($this->checkUser($user));
 
         return Notification::select('from','description')->where('to_user_id',$user->id)->orderBy('id', 'DESC')->get();//
     }
@@ -96,10 +115,29 @@ class UsersController extends Controller
 
     public function notify(User $user, Request $request)
     {
-    
+        $validator = Validator::make($request->all(), [
+            'to_username' => ['required','string', 'max:255'],
+            'message' => ['string',' min:1','max:511'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()], 401);
+        }
+        
         if ($this->checkUser($user)!="ok") return response()->json($this->checkUser($user));
         $user02 = User::where('username', $request['to_username']);
-        if ($user02->count()>0) $user->notifyUser($user,$request['message'],'user',$user02->get()[0],null);
+        if ($user02->count()>0) 
+        {
+            $notification = array(
+                "to_user_id" => $user02->get()[0]->id,
+                "from" => $user->username,
+                "descripton" => $request['message'],
+            );
+            $user->addNotification($notification);
+        } else 
+        {
+            return response()->json("User " . $request['to_username'] . " not found");
+        }
     }
 
     
@@ -120,18 +158,21 @@ class UsersController extends Controller
     {
         if ($this->checkUser($user)!="ok") return response()->json($this->checkUser($user));
 
+
         $validator = Validator::make($request->all(),[
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'age' => ['required', 'numeric'],
-            'gender' => ['required', 'string', 'max:10'],
+            'gender' => ['required', 'string', 'max:20'],
         ]);
+
+
         if ($validator->fails()) {
             return response()->json(['error' => $validator->errors()], 401);
         }
 
-        $user->first_name = utf8_decode(strtoupper($request['first_name']));
-        $user->last_name = utf8_decode(strtoupper($request['last_name']));
+        $user->first_name = strtoupper($request['first_name']);
+        $user->last_name = strtoupper($request['last_name']);
         $user->age = $request['age'];
         $user->gender = $request['gender'];
         

@@ -18,9 +18,11 @@ class ReportsController extends Controller
 
     	$ptsLost = User::where('infected',TRUE)->sum('total_points');
 
-    	if ($users>0) return response()->json(["Percentage of infected survivors" => round(100*($infected/$users),2) . "%", "Percentage of non-infected survivors" => round(100*(1-($infected/$users)),2) . "%", "Points lost because of infected survivor" => $ptsLost]);
+    	$ptsTotal = User::where('infected',FALSE)->sum('total_points');
 
-    	response()->json(["percentage of infected survivors" => 0 . "%", "percentage of non-infected survivors" => 0,"Points lost because of infected survivor" => 0]);
+    	if ($users>0) return response()->json(["Percentage of infected survivors" => round(100*($infected/$users),2) . "%", "Percentage of non-infected survivors" => round(100*(1-($infected/$users)),2) . "%", "Points lost because of infected survivor" => $ptsLost, "Total points avaiable" => $ptsTotal]);
+
+    	response()->json(["percentage of infected survivors" => 0 . "%", "percentage of non-infected survivors" => 0,"Points lost because of infected survivor" => 0, "Total points avaiable" => 0]);
     }
 
 

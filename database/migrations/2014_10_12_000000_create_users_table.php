@@ -26,8 +26,6 @@ class CreateUsersTable extends Migration
             $table->text('location')->nullable();
             $table->double('offer_range')->default(1);
             $table->boolean('infected')->default(FALSE);
-            $table->string('secret_question');
-            $table->string('secret_answer');
             $table->double('total_points')->default(0);
             $table->timestamps();
         });

@@ -55,7 +55,7 @@ class User extends Authenticatable
     }
 
     # Updates users location
-    public function updateLocation($request)
+    public function updateLocation($request, $flag01, $flag02)
     {
         if (!$this->infected)
         {
@@ -92,8 +92,15 @@ class User extends Authenticatable
                             $user02 = User::find($trade->user_id_01);
                         }
                          $description = "User " . $this->first_name . " " . $this->last_name . " that will trade items with you has just update its location to : ". $this->location . " LAT: " . $this->latitude . " LONG: ".$this->longitude;
-                            
-                        $user02->notifyUser($user02,$description,"SYSTEM",null,null);            
+
+
+
+                         $notification = array(
+                                "to_user_id" => $user02->id,
+                                "from" => "SYSTEM",
+                                "descripton" => $description,
+                            );
+                        $this->addNotification($notification);    
                    }
             }
 
@@ -107,8 +114,18 @@ class User extends Authenticatable
               foreach ($offers as $offer) $this->matchOffer($offer);  
             }
 
-            return "Your location has been successfully updated to ". $this->location . " Lat: " . $this->latitude
-                    . ", Long:" . $this->longitude;
+            If ($flag01 && $flag02) 
+
+            {
+                return "Your location has been updated to ". $this->location . " Lat: " . $this->latitude . ", Long:" . $this->longitude . ". And your offer search distance was set to " . $this->offer_range . " km";
+            } elseif($flag01) 
+            {
+                return "Your location has been updated to ". $this->location . " Lat: " . $this->latitude . ", Long:" . $this->longitude;
+            } elseif($flag02)
+            {
+                return "Your offer search distance was set to " . $this->offer_range . " km";
+            }
+
         } else 
         {
             return "Error 100: This user is infected";
@@ -168,7 +185,7 @@ class User extends Authenticatable
             # Mark a user as infected in case it has mora than three reports
             $this->isUserInfected($user);
 
-            return "You've just reported ('" . $user->username .") ". $user->first_name . " ". $user->last_name . "'s contamination. Thanks for making ZSSN safer!!!";  
+            return "You've just reported (" . $user->username .") ". $user->first_name . " ". $user->last_name . "'s contamination. Thanks for making ZSSN safer!!!";  
         } else
         {
             return "Error 100: This user is infected";
@@ -178,6 +195,7 @@ class User extends Authenticatable
     # Returns all belongings of a given user
     public function addOffer($request)
     {
+    
         if (!$this->infected)
         {
             $check_offer = $this->validateOffer($request);
@@ -203,16 +221,52 @@ class User extends Authenticatable
         }
     }
 
+    public function findOffersNearBy($user)
+    {   
+        
+        $offers = DB::select("SELECT *, SQRT(POW(69.1 * (latitude - '$user->latitude'), 2) + POW(69.1 * ('$user->longitude' - longitude) * COS(latitude / 57.3), 2))*1.60934 AS distance FROM offers WHERE status = 'open' and user_id != '$user->id' HAVING distance <= '$user->offer_range' ORDER BY distance");
+
+        (count($offers)>0) ? $offres_mounted = $this->mountOffer($offers) : $offres_mounted = "No offers found.";
+
+        return $offres_mounted;
+    }
+
     public function myOpenOffers()
     {
-        if (!$this->infected)
+        $offers = Offer::where('user_id',$this->id)->where('status', 'open')->get();
+        
+        ($offers->count()>0) ? $offres_mounted = $this->mountOffer($offers) : $offres_mounted = "No offers found.";
+
+        return  $offres_mounted;             
+   
+    }
+
+    private function mountOffer($offers)
+    {
+        $arr = array();           
+        foreach ($offers as $offer)
         {
-            return Offer::where('user_id',$this->id)
-                      ->where('status', 'open')->get();
-        } else 
-        {
-            return "Error 100: This user is infected";
+            $water = OfferItem::where("offer_id",$offer->id)->where("item_id",1)->where("offering",1)->count();
+            $food = OfferItem::where("offer_id",$offer->id)->where("item_id",2)->where("offering",1)->count();
+            $medication = OfferItem::where("offer_id",$offer->id)->where("item_id",3)->where("offering",1)->count();
+            $ammunition = OfferItem::where("offer_id",$offer->id)->where("item_id",4)->where("offering",1)->count();
+
+            $off = array("water"=>$water, "food" =>$food,"medication" => $medication , "ammunition" => $ammunition);
+
+            $water = OfferItem::where("offer_id",$offer->id)->where("item_id",1)->where("offering",0)->count();
+            $food = OfferItem::where("offer_id",$offer->id)->where("item_id",2)->where("offering",0)->count();
+            $medication = OfferItem::where("offer_id",$offer->id)->where("item_id",3)->where("offering",0)->count();
+            $ammunition = OfferItem::where("offer_id",$offer->id)->where("item_id",4)->where("offering",0)->count();
+
+            $rec = array("water"=>$water, "food" =>$food, "medication" => $medication, "ammunition" => $ammunition);
+
+            $user = User::find($offer->user_id);
+            
+            ((isset($offer->distance)) ? $res = array("offer_id" => $offer->id, "created by" =>$user->username, "points" => $offer->points,"distance" => round($offer->distance,2) . " km","location" => $user->location,"Offering_Items" => $off, "Receiving_Items" => $rec) : $res =array("offer_id" => $offer->id, "created by" => $user->username,"points" => $offer->points,"Offering_Items" => $off, "Receiving_Items" => $rec));
+
+            array_push($arr,$res);
         }
+        return $arr;
     }
 
     public function deleteOffer($offer_id)
@@ -269,17 +323,54 @@ class User extends Authenticatable
 
     public function myOpenTrades ()
     {
-        if (!$this->infected)
-        {
-            return Trade::where('status','FALSE')
-                          ->where(function($query){
-                            $query->where('user_id_01', $this->id)
-                            ->orWhere('user_id_02',$this->id);
-                          })->get();
+        
+        $trades = Trade::where('status','FALSE')
+                      ->where(function($query){
+                        $query->where('user_id_01', $this->id)
+                        ->orWhere('user_id_02',$this->id);
+                      })->get();
+
+        if ($trades->count()>0)
+        {   
+            $arr = array();
+            foreach ($trades as $trade)
+            {
+                ($trade->user_id_01 == $this->id) ? $offer = $trade->offer01 : $offer = $trade->offer02;
+
+                ($trade->user_id_01 == $this->id) ? $user_id = $trade->user_id_02 : $user_id = $trade->user_id_01;
+                
+                $water = $offer->items->where("item_id",1)->where("offering",1)->count();
+                $food = $offer->items->where("item_id",2)->where("offering",1)->count();
+                $medication = $offer->items->where("item_id",3)->where("offering",1)->count();
+                $ammunition = $offer->items->where("item_id",4)->where("offering",1)->count();
+
+                $off = array("water"=>$water, "food" =>$food,"medication" => $medication , "ammunition" => $ammunition);
+
+                $water = $offer->items->where("item_id",1)->where("offering",0)->count();
+                $food = $offer->items->where("item_id",2)->where("offering",0)->count();
+                $medication = $offer->items->where("item_id",3)->where("offering",0)->count();
+                $ammunition = $offer->items->where("item_id",4)->where("offering",0)->count();
+
+                $rec = array("water"=>$water, "food" =>$food, "medication" => $medication, "ammunition" => $ammunition);
+                
+                $user = User::find($user_id);
+
+                $res = array("trade_id" => $trade->id, "with" => $user->username, "located at" => $user->location, "points" => $offer->points, "Offering_Items" => $off, "Receiving_Items" => $rec);
+                array_push($arr,$res);
+            }
+
+            return $arr;
         } else
         {
-            return "Error 100: This user is infected";
+            return "Not trades at the moment";
         }
+
+        return Trade::where('status','FALSE')
+                      ->where(function($query){
+                        $query->where('user_id_01', $this->id)
+                        ->orWhere('user_id_02',$this->id);
+                      })->get();
+       
     }
 
     public function closeTrade ($trade_id)
@@ -312,8 +403,8 @@ class User extends Authenticatable
                 $user_01 = User::find($trade->user_id_01);
                 $user_02 = User::find($trade->user_id_02);
                 
-                $this->notifyUser($user_01, 'You have just traded items with '. $user_02->first_name .' ' . $user_02->first_name, 'SYSTEM', null,null);
-                $this->notifyUser($user_02, 'You have just traded items with '. $user_01->first_name .' ' . $user_01->first_name, 'SYSTEM', null,null);
+                $this->notifyUser($user_01, 'You have just traded items with '. $user_02->first_name .' ' . $user_02->last_name, 'SYSTEM', null,null);
+                $this->notifyUser($user_02, 'You have just traded items with '. $user_01->first_name .' ' . $user_01->last_name, 'SYSTEM', null,null);
                  
                  $trade->delete();
                  $offer_01->delete();
@@ -459,7 +550,6 @@ class User extends Authenticatable
         $offer->save();
         $user = User::find($user_id);
         $message = "Caution!!! The user ". $zombie->username ." that you're about to trade items has just been infected. Stay away from it. Your offer was placed back in the offers pool";
-        $this->notifyUser($user,$message,'SYSTEM',null,null);
 
         $notification = array(
                 "to_user_id" => $user->id,
@@ -599,16 +689,52 @@ class User extends Authenticatable
         }
     }
 
-
-
     private function validateOffer($request)
     {
         $response = 'ok';
-        $offering = $request['offering'];
-        if(count($offering)==0) return ["response" => "Error 011: Offer is empty"];
-        $receiving = $request['receiving'];
+        $offering = array();
+        $receiving = array();
         $countOffering = 0;
         $countReceiving = 0;
+
+        if (isset($request['offering']["water"]))
+        {
+             if ($request['offering']["water"]>0) for ($i=0; $i<$request['offering']["water"];$i++) array_push($offering,"WATER");
+        }; 
+        if (isset($request['offering']["food"]))
+        {
+            if ($request['offering']["food"]>0) for ($i=0; $i<$request['offering']["food"];$i++) array_push($offering,"FOOD");
+        }
+        if (isset($request['offering']["medication"]))
+        {
+            if ($request['offering']["medication"]>0) for ($i=0; $i<$request['offering']["medication"];$i++) array_push($offering,"MEDICATION");
+
+        }    
+        if (isset($request['offering']["ammunition"]))
+        {
+            if ($request['offering']["ammunition"]>0) for ($i=0; $i<$request['offering']["ammunition"];$i++) array_push($offering,"AMMUNITION");
+        }
+        if(count($offering)==0) return ["response" => "Error 011: Offer is empty"];
+
+        
+        if(isset($request['receiving']["water"]))
+        {
+            if ($request['receiving']["water"]>0) for ($i=0; $i<$request['receiving']["water"];$i++) array_push($receiving,"WATER");
+        }
+        if(isset($request['receiving']["food"]))
+        {
+            if ($request['receiving']["food"]>0) for ($i=0; $i<$request['receiving']["food"];$i++) array_push($receiving,"FOOD");
+        }
+
+        if(isset($request['receiving']["medication"]))
+        {
+             if ($request['receiving']["medication"]>0) for ($i=0; $i<$request['receiving']["medication"];$i++) array_push($receiving,"MEDICATION");
+        }  
+        if(isset($request['receiving']["ammunition"]))
+        {
+            if ($request['receiving']["ammunition"]>0) for ($i=0; $i<$request['receiving']["ammunition"];$i++) array_push($receiving,"AMMUNITION");
+        }
+        if(count($receiving)==0) return ["response" => "Error 011: Your receiving basket is empty"];
     
         $belongings = $this->belongings;
         $addItems = 0;
@@ -616,16 +742,11 @@ class User extends Authenticatable
         $items_id = array();
         foreach ($offering as $item)
         { 
-            $item_found = Item::where('item',strtoupper($item))->get();
-            if ($item_found->count()==0)
-            {
-                $response = "Error 014: The are invalid items in your offer";
-                break;
-            }
             $index = 0;
             $found = FALSE;
             foreach ($belongings as $belonging)
             {
+                $item_found = Item::where('item',strtoupper($item))->get();
                 if ($item_found[0]->id==$belonging->item_id && (!$belonging->reserved))
                 {
                     $addItems++;
@@ -645,12 +766,6 @@ class User extends Authenticatable
         foreach ($receiving as $item)
         { 
             $item_found = Item::where('item',strtoupper($item))->get();
-            
-            if ($item_found->count()==0)
-            {
-                $response = "Error 014: The are invalid items in your offer";
-                break;
-            }
             array_push($items_id,$item_found[0]->id); 
             $countReceiving= $item_found[0]->points + $countReceiving;
         }

@@ -35,7 +35,6 @@ Route::group(['middleware' => 'auth:api'], function(){
 	Route::get('/{user}/offer/', 'OffersController@myOffers');
 	Route::get('/{user}/offer/find', 'OffersController@findOffersNearBy');
 	Route::get('/{user}/offer/trade', 'OffersController@myOpenTrades');
-	Route::get('/{user}/offer/details', 'OffersController@offerDetails');
 	
 	Route::post('/{user}/offer/', 'OffersController@create');
 	Route::post('/{user}/offer/trade', 'OffersController@closeTrade');
