@@ -3,6 +3,9 @@ Api for Zombie-Survival-Social-Network challange
 
 API Documentation [pt]: https://documenter.getpostman.com/view/7101712/S17wPn4d#3b377e76-1f29-4376-83f6-4439c16292a6
 
+
+<b> Problem Description </b>
+
 ZSSN (Zombie Survival Social Network)
 Problem Description
 The world as we know it has fallen into an apocalyptic scenario. A laboratory-made virus is transforming human beings and animals into zombies, hungry for fresh flesh.
