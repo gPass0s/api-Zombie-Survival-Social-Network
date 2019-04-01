@@ -45,3 +45,5 @@ To do that, they must respect the price table below, where the value of an item 
 Both sides of the trade should offer the same amount of points. For example, 1 Water and 1 Medication (1 x 4 + 1 x 2) is worth 6 ammunition (6 x 1) or 2 Food items (2 x 3).
 
 The trades themselves need not to be stored, but the items must be transferred from one survivor to the other.
+
+1 Water = 4 points 1 Food = 3 points 1 Medication = 2 points 1 Ammunitio = 1 point
