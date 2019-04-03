@@ -1,7 +1,7 @@
 # api-Zombie-Survival-Social-Network
 Api for Zombie-Survival-Social-Network challange
 
-API Documentation [pt]: https://documenter.getpostman.com/view/7101712/S17wPn4d#3b377e76-1f29-4376-83f6-4439c16292a6
+API Documentation [pt]: https://documenter.getpostman.com/view/7101712/S17wPn4d
 
 
 <b> Problem Description </b>
